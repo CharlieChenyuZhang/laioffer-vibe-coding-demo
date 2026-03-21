@@ -1,65 +1,108 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useState, useEffect } from "react";
+import { useAuth } from "@/contexts/auth-context";
+import { useCart } from "@/contexts/cart-context";
+import type { Category, MenuItem } from "@/lib/types";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { useRouter } from "next/navigation";
+
+export default function MenuPage() {
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [activeCategory, setActiveCategory] = useState<string>("");
+  const { user, loading: authLoading } = useAuth();
+  const { addItem, items: cartItems } = useCart();
+  const router = useRouter();
+
+  useEffect(() => {
+    fetch("/api/categories")
+      .then((r) => r.json())
+      .then((data: Category[]) => {
+        setCategories(data);
+        if (data.length > 0) setActiveCategory(data[0].id);
+      });
+  }, []);
+
+  useEffect(() => {
+    if (!authLoading && user?.role === "admin") {
+      router.push("/admin/orders");
+    }
+  }, [user, authLoading, router]);
+
+  const getCartQuantity = (menuItemId: string) => {
+    return cartItems.find((i) => i.menuItem.id === menuItemId)?.quantity || 0;
+  };
+
+  const handleAddItem = (item: MenuItem) => {
+    if (!user) {
+      router.push("/login");
+      return;
+    }
+    addItem(item);
+  };
+
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[80vh]">
+        <p className="text-gray-500">加载中...</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+    <div className="max-w-6xl mx-auto px-4 py-6">
+      <h1 className="text-2xl font-bold mb-6">菜单</h1>
+
+      {/* Category tabs */}
+      <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
+        {categories.map((cat) => (
+          <Button
+            key={cat.id}
+            variant={activeCategory === cat.id ? "default" : "outline"}
+            size="sm"
+            onClick={() => setActiveCategory(cat.id)}
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+            {cat.name}
+          </Button>
+        ))}
+      </div>
+
+      {/* Menu items */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {categories
+          .find((c) => c.id === activeCategory)
+          ?.items.map((item) => (
+            <Card key={item.id}>
+              <CardContent className="p-4">
+                <div className="flex justify-between items-start mb-2">
+                  <div>
+                    <h3 className="font-semibold text-lg">{item.name}</h3>
+                    <p className="text-sm text-gray-500">{item.description}</p>
+                  </div>
+                  {getCartQuantity(item.id) > 0 && (
+                    <Badge variant="secondary">
+                      x{getCartQuantity(item.id)}
+                    </Badge>
+                  )}
+                </div>
+                <div className="flex justify-between items-center mt-4">
+                  <span className="text-lg font-bold text-red-600">
+                    ¥{item.price}
+                  </span>
+                  <Button size="sm" onClick={() => handleAddItem(item)}>
+                    加入购物车
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+      </div>
+
+      {categories.find((c) => c.id === activeCategory)?.items.length === 0 && (
+        <p className="text-center text-gray-500 py-12">该分类暂无菜品</p>
+      )}
     </div>
   );
 }

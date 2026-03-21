@@ -1,0 +1,59 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  username  String   @unique
+  password  String
+  role      String   @default("customer") // "customer" | "admin"
+  createdAt DateTime @default(now())
+  orders    Order[]
+}
+
+model Category {
+  id        String     @id @default(cuid())
+  name      String     @unique
+  sortOrder Int        @default(0)
+  items     MenuItem[]
+}
+
+model MenuItem {
+  id          String      @id @default(cuid())
+  name        String
+  description String      @default("")
+  price       Float
+  image       String      @default("")
+  available   Boolean     @default(true)
+  categoryId  String
+  category    Category    @relation(fields: [categoryId], references: [id])
+  orderItems  OrderItem[]
+}
+
+model Order {
+  id        String      @id @default(cuid())
+  status    String      @default("pending") // pending | preparing | completed | picked_up
+  total     Float
+  note      String      @default("")
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  userId    String
+  user      User        @relation(fields: [userId], references: [id])
+  items     OrderItem[]
+}
+
+model OrderItem {
+  id         String   @id @default(cuid())
+  quantity   Int
+  price      Float
+  menuItemId String
+  menuItem   MenuItem @relation(fields: [menuItemId], references: [id])
+  orderId    String
+  order      Order    @relation(fields: [orderId], references: [id])
+}
